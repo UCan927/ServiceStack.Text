@@ -7,7 +7,7 @@ namespace ServiceStack.Text
     public sealed class JsConfigScope : IDisposable
     {
         bool disposed;
-        JsConfigScope parent;
+        readonly JsConfigScope parent;
 
         [ThreadStatic]
         private static JsConfigScope head;
@@ -20,20 +20,11 @@ namespace ServiceStack.Text
             head = this;
         }
 
-        internal static JsConfigScope Current
-        {
-            get
-            {
-                return head;
-            }
-        }
+        internal static JsConfigScope Current => head;
 
         public static void DisposeCurrent()
         {
-            if (head != null)
-            {
-                head.Dispose();
-            }
+            head?.Dispose();
         }
 
         public void Dispose()
@@ -61,6 +52,7 @@ namespace ServiceStack.Text
         public bool? ExcludeTypeInfo { get; set; }
         public bool? IncludeTypeInfo { get; set; }
         public string TypeAttr { get; set; }
+        public string DateTimeFormat { get; set; }
         internal string JsonTypeAttrInObject { get; set; }
         internal string JsvTypeAttrInObject { get; set; }
         public Func<Type, string> TypeWriter { get; set; }
@@ -76,8 +68,6 @@ namespace ServiceStack.Text
         public bool? AlwaysUseUtc { get; set; }
         public bool? AssumeUtc { get; set; }
         public bool? AppendUtcOffset { get; set; }
-        public bool? EscapeUnicode { get; set; }
-        public bool? EscapeHtmlChars { get; set; }
         public bool? PreferInterfaces { get; set; }
         public bool? IncludePublicFields { get; set; }
         public int? MaxDepth { get; set; }

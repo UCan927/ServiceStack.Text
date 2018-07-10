@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Threading;
 using NUnit.Framework;
 
 namespace ServiceStack.Text.Tests.JsonTests
@@ -35,16 +38,52 @@ namespace ServiceStack.Text.Tests.JsonTests
         [Test]
         public void Can_serialize_null_JsonObject_response()
         {
-            JsConfig.ThrowOnDeserializationError = true;
+            JsConfig.ThrowOnError = true;
             var json = "{\"result\":null}";
             var dto = json.FromJson<JsonObjectResponse>();
             Assert.That(dto.result, Is.Null);
-            JsConfig.ThrowOnDeserializationError = false;
+            JsConfig.ThrowOnError = false;
         }
 
         [Test]
         public void Can_Serialize_numbers()
         {
+            var culture = new CultureInfo("en-US");
+            Thread.CurrentThread.CurrentCulture = culture;
+            Thread.CurrentThread.CurrentUICulture = culture;
+
+            string notNumber = "{\"field\":\"00001\"}";
+            Assert.That(JsonObject.Parse(notNumber).ToJson(), Is.EqualTo(notNumber));
+
+            string num1 = "{\"field\":0}";
+            Assert.That(JsonObject.Parse(num1).ToJson(), Is.EqualTo(num1));
+
+            string num2 = "{\"field\":0.5}";
+            Assert.That(JsonObject.Parse(num2).ToJson(), Is.EqualTo(num2));
+
+            string num3 = "{\"field\":.5}";
+            Assert.That(JsonObject.Parse(num3).ToJson(), Is.EqualTo(num3));
+
+            string num4 = "{\"field\":12312}";
+            Assert.That(JsonObject.Parse(num4).ToJson(), Is.EqualTo(num4));
+
+            string num5 = "{\"field\":12312.1231}";
+            Assert.That(JsonObject.Parse(num5).ToJson(), Is.EqualTo(num5));
+
+            string num6 = "{\"field\":1435252569117}";
+            Assert.That(JsonObject.Parse(num6).ToJson(), Is.EqualTo(num6));
+
+            string num7 = "{\"field\":1435052569117}";
+            Assert.That(JsonObject.Parse(num7).ToJson(), Is.EqualTo(num7));
+        }
+
+        [Test]
+        public void Can_Serialize_numbers_DifferentCulture()
+        {
+            var culture = new CultureInfo("sl-SI");
+            Thread.CurrentThread.CurrentCulture = culture;
+            Thread.CurrentThread.CurrentUICulture = culture;
+
             string notNumber = "{\"field\":\"00001\"}";
             Assert.That(JsonObject.Parse(notNumber).ToJson(), Is.EqualTo(notNumber));
 
@@ -403,5 +442,70 @@ namespace ServiceStack.Text.Tests.JsonTests
             // There can be more nested objects in here
         }
 
+        
+        public class CreateEvent
+        {
+            public EventContent Event { get; set; }
+        }
+
+        public class EventContent
+        {
+            public JsonObject EventPayLoad { get; set; }
+            public object EventObject { get; set; }
+        }
+
+        public class EventPayLoadPosition
+        {
+            public double? Heading { get; set; }
+
+            public double? Accuracy { get; set; }
+
+            public double? Speed { get; set; }
+        }
+
+        [Test]
+        public void Can_deserialize_custom_JsonObject_payload()
+        {
+            var json = "{\"Event\":{\"EventPayload\":{\"Heading\":1.1}}}";
+            var dto = json.FromJson<CreateEvent>();
+            
+            Assert.That(dto.Event.EventPayLoad.Get("Heading"), Is.EqualTo("1.1"));
+
+            var payload = dto.Event.EventPayLoad.ConvertTo<EventPayLoadPosition>();
+            Assert.That(payload.Heading, Is.EqualTo(1.1));
+        }
+
+        [Test]
+        public void Can_deserialize_custom_object_payload()
+        {
+            JS.Configure();
+            
+            var json = "{\"Event\":{\"EventObject\":{\"Heading\":1.1}}}";
+            var dto = json.FromJson<CreateEvent>();
+
+            var obj = (Dictionary<string, object>)dto.Event.EventObject;
+
+            var payload = obj.FromObjectDictionary<EventPayLoadPosition>();
+
+            Assert.That(payload.Heading, Is.EqualTo(1.1));
+
+            JS.UnConfigure();
+        }
+
+        [Test]
+        public void Can_deserialize_custom_JsonObject_with_incorrect_payload()
+        {
+            var json = "{\"Event\":{\"EventPayload\":{\"Heading\":24.687999725341797.0}}}";
+            var dto = json.FromJson<CreateEvent>();
+
+            try
+            {
+                var payload = dto.Event.EventPayLoad.ConvertTo<EventPayLoadPosition>();
+                Assert.Fail("Should throw");
+            }
+            catch (FormatException e) {}
+        }
+        
+        
     }
 }

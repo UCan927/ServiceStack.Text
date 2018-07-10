@@ -309,5 +309,45 @@ namespace ServiceStack.Text.Tests
                 new TestJArray { Id = 2, Name = "Role 2" },
             }));
         }
+
+        [Test]
+        public void Can_deserialice_string_list()
+        {
+            var obj = new JsonObject {
+                ["null"] = null,
+                ["item"] = "foo",
+                ["list"] = new List<string> { "foo", "bar", "qux" }.ToJson()
+            };
+
+            var nullList = obj["null"].FromJson<List<string>>();
+            var itemList = obj["item"].FromJson<List<string>>();
+            var listList = obj["list"].FromJson<List<string>>();
+            
+            Assert.That(nullList, Is.Null);
+            Assert.That(itemList, Is.EquivalentTo(new[]{ "foo" }));
+            Assert.That(listList, Is.EquivalentTo(new[]{ "foo", "bar", "qux" }));
+        }
+
+        [Test]
+        public void Can_deserialize_Inherited_JSON_Object()
+        {
+            var jsonValue = "{\"test\":[\"Test1\",\"Test Two\"]}";
+
+            var jsonObject = JsonSerializer.DeserializeFromString<JsonObject>(jsonValue);
+            var inheritedJsonObject = JsonSerializer.DeserializeFromString<InheritedJsonObject>(jsonValue);
+
+            string testString = jsonObject.Child("test");
+            string inheritedTestString = inheritedJsonObject.Child("test");
+
+            Assert.AreEqual(testString, inheritedTestString);
+
+            var serializedJsonObject = JsonSerializer.SerializeToString<JsonObject>(jsonObject);
+            var serializedInheritedJsonObject = JsonSerializer.SerializeToString<InheritedJsonObject>(inheritedJsonObject);
+
+            Assert.AreEqual(serializedJsonObject, serializedInheritedJsonObject);
+        }
+        
+        public class InheritedJsonObject : JsonObject { }
+
     }
 }

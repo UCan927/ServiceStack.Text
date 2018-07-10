@@ -415,7 +415,7 @@ namespace ServiceStack
             return null;
         }
 
-        public override ParseStringSegmentDelegate GetDictionaryParseStringSegmentMethod<TSerializer>(Type type)
+        public override ParseStringSpanDelegate GetDictionaryParseStringSpanMethod<TSerializer>(Type type)
         {
             if (type == typeof(Hashtable))
             {
@@ -433,7 +433,7 @@ namespace ServiceStack
             return null;
         }
 
-        public override ParseStringSegmentDelegate GetSpecializedCollectionParseStringSegmentMethod<TSerializer>(Type type)
+        public override ParseStringSpanDelegate GetSpecializedCollectionParseStringSpanMethod<TSerializer>(Type type)
         {
             if (type == typeof(StringCollection))
             {
@@ -455,13 +455,13 @@ namespace ServiceStack
             return null;
         }
 
-        public override ParseStringSegmentDelegate GetJsReaderParseStringSegmentMethod<TSerializer>(Type type)
+        public override ParseStringSpanDelegate GetJsReaderParseStringSpanMethod<TSerializer>(Type type)
         {
 #if !(__IOS__ || LITE)
             if (type.IsAssignableFrom(typeof(System.Dynamic.IDynamicMetaObjectProvider)) ||
                 type.HasInterface(typeof(System.Dynamic.IDynamicMetaObjectProvider)))
             {
-                return DeserializeDynamic<TSerializer>.ParseStringSegment;
+                return DeserializeDynamic<TSerializer>.ParseStringSpan;
             }
 #endif
             return null;
@@ -612,253 +612,6 @@ namespace ServiceStack
     }
 #endif
 
-#if __IOS__ || __MAC__
-    [Preserve(AllMembers = true)]
-    internal class Poco
-    {
-        public string Dummy { get; set; }
-    }
-
-    public class IosPclExport : Net40PclExport
-    {
-        public static new IosPclExport Provider = new IosPclExport();
-
-        public IosPclExport()
-        {
-            PlatformName = "IOS";
-            SupportsEmit = SupportsExpression = false;
-        }
-
-        public new static void Configure()
-        {
-            Configure(Provider);
-        }
-
-        public override void ResetStream(Stream stream)
-        {
-            // MonoTouch throws NotSupportedException when setting System.Net.WebConnectionStream.Position
-            // Not sure if the stream is used later though, so may have to copy to MemoryStream and
-            // pass that around instead after this point?
-        }
-
-        /// <summary>
-        /// Provide hint to IOS AOT compiler to pre-compile generic classes for all your DTOs.
-        /// Just needs to be called once in a static constructor.
-        /// </summary>
-        [Preserve]
-        public static void InitForAot()
-        {
-        }
-
-        [Preserve]
-        public override void RegisterForAot()
-        {
-            RegisterTypeForAot<Poco>();
-
-            RegisterElement<Poco, string>();
-
-            RegisterElement<Poco, bool>();
-            RegisterElement<Poco, char>();
-            RegisterElement<Poco, byte>();
-            RegisterElement<Poco, sbyte>();
-            RegisterElement<Poco, short>();
-            RegisterElement<Poco, ushort>();
-            RegisterElement<Poco, int>();
-            RegisterElement<Poco, uint>();
-
-            RegisterElement<Poco, long>();
-            RegisterElement<Poco, ulong>();
-            RegisterElement<Poco, float>();
-            RegisterElement<Poco, double>();
-            RegisterElement<Poco, decimal>();
-
-            RegisterElement<Poco, bool?>();
-            RegisterElement<Poco, char?>();
-            RegisterElement<Poco, byte?>();
-            RegisterElement<Poco, sbyte?>();
-            RegisterElement<Poco, short?>();
-            RegisterElement<Poco, ushort?>();
-            RegisterElement<Poco, int?>();
-            RegisterElement<Poco, uint?>();
-            RegisterElement<Poco, long?>();
-            RegisterElement<Poco, ulong?>();
-            RegisterElement<Poco, float?>();
-            RegisterElement<Poco, double?>();
-            RegisterElement<Poco, decimal?>();
-
-            //RegisterElement<Poco, JsonValue>();
-
-            RegisterTypeForAot<DayOfWeek>(); // used by DateTime
-
-            // register built in structs
-            RegisterTypeForAot<Guid>();
-            RegisterTypeForAot<TimeSpan>();
-            RegisterTypeForAot<DateTime>();
-            RegisterTypeForAot<DateTimeOffset>();
-
-            RegisterTypeForAot<Guid?>();
-            RegisterTypeForAot<TimeSpan?>();
-            RegisterTypeForAot<DateTime?>();
-            RegisterTypeForAot<DateTimeOffset?>();
-        }
-
-        [Preserve]
-        public static void RegisterTypeForAot<T>()
-        {
-            AotConfig.RegisterSerializers<T>();
-        }
-
-        [Preserve]
-        public static void RegisterQueryStringWriter()
-        {
-            var i = 0;
-            if (QueryStringWriter<Poco>.WriteFn() != null) i++;
-        }
-
-        [Preserve]
-        public static int RegisterElement<T, TElement>()
-        {
-            var i = 0;
-            i += AotConfig.RegisterSerializers<TElement>();
-            AotConfig.RegisterElement<T, TElement, JsonTypeSerializer>();
-            AotConfig.RegisterElement<T, TElement, Text.Jsv.JsvTypeSerializer>();
-            return i;
-        }
-
-        ///<summary>
-        /// Class contains Ahead-of-Time (AOT) explicit class declarations which is used only to workaround "-aot-only" exceptions occured on device only. 
-        /// </summary>			
-        [Preserve(AllMembers = true)]
-        internal class AotConfig
-        {
-            internal static JsReader<JsonTypeSerializer> jsonReader;
-            internal static JsWriter<JsonTypeSerializer> jsonWriter;
-            internal static JsReader<Text.Jsv.JsvTypeSerializer> jsvReader;
-            internal static JsWriter<Text.Jsv.JsvTypeSerializer> jsvWriter;
-            internal static JsonTypeSerializer jsonSerializer;
-            internal static Text.Jsv.JsvTypeSerializer jsvSerializer;
-
-            static AotConfig()
-            {
-                jsonSerializer = new JsonTypeSerializer();
-                jsvSerializer = new Text.Jsv.JsvTypeSerializer();
-                jsonReader = new JsReader<JsonTypeSerializer>();
-                jsonWriter = new JsWriter<JsonTypeSerializer>();
-                jsvReader = new JsReader<Text.Jsv.JsvTypeSerializer>();
-                jsvWriter = new JsWriter<Text.Jsv.JsvTypeSerializer>();
-            }
-
-            internal static int RegisterSerializers<T>()
-            {
-                var i = 0;
-                i += Register<T, JsonTypeSerializer>();
-                if (jsonSerializer.GetParseFn<T>() != null) i++;
-                if (jsonSerializer.GetWriteFn<T>() != null) i++;
-                if (jsonReader.GetParseFn<T>() != null) i++;
-                if (jsonWriter.GetWriteFn<T>() != null) i++;
-
-                i += Register<T, Text.Jsv.JsvTypeSerializer>();
-                if (jsvSerializer.GetParseFn<T>() != null) i++;
-                if (jsvSerializer.GetWriteFn<T>() != null) i++;
-                if (jsvReader.GetParseFn<T>() != null) i++;
-                if (jsvWriter.GetWriteFn<T>() != null) i++;
-
-                //RegisterCsvSerializer<T>();
-                RegisterQueryStringWriter();
-                return i;
-            }
-
-            internal static void RegisterCsvSerializer<T>()
-            {
-                CsvSerializer<T>.WriteFn();
-                CsvSerializer<T>.WriteObject(null, null);
-                CsvWriter<T>.Write(null, default(IEnumerable<T>));
-                CsvWriter<T>.WriteRow(null, default(T));
-            }
-
-            public static ParseStringDelegate GetParseFn(Type type)
-            {
-                var parseFn = JsonTypeSerializer.Instance.GetParseFn(type);
-                return parseFn;
-            }
-
-            internal static int Register<T, TSerializer>() where TSerializer : ITypeSerializer
-            {
-                var i = 0;
-
-                if (JsonWriter<T>.WriteFn() != null) i++;
-                if (JsonWriter.Instance.GetWriteFn<T>() != null) i++;
-                if (JsonReader.Instance.GetParseFn<T>() != null) i++;
-                if (JsonReader<T>.Parse(null) != null) i++;
-                if (JsonReader<T>.GetParseFn() != null) i++;
-                //if (JsWriter.GetTypeSerializer<JsonTypeSerializer>().GetWriteFn<T>() != null) i++;
-                if (new List<T>() != null) i++;
-                if (new T[0] != null) i++;
-
-                JsConfig<T>.ExcludeTypeInfo = false;
-
-                if (JsConfig<T>.OnDeserializedFn != null) i++;
-                if (JsConfig<T>.HasDeserializeFn) i++;
-                if (JsConfig<T>.SerializeFn != null) i++;
-                if (JsConfig<T>.DeSerializeFn != null) i++;
-                //JsConfig<T>.SerializeFn = arg => "";
-                //JsConfig<T>.DeSerializeFn = arg => default(T);
-                if (TypeConfig<T>.Properties != null) i++;
-
-/*
-                if (WriteType<T, TSerializer>.Write != null) i++;
-                if (WriteType<object, TSerializer>.Write != null) i++;
-				
-                if (DeserializeBuiltin<T>.Parse != null) i++;
-                if (DeserializeArray<T[], TSerializer>.Parse != null) i++;
-                DeserializeType<TSerializer>.ExtractType(null);
-                DeserializeArrayWithElements<T, TSerializer>.ParseGenericArray(null, null);
-                DeserializeCollection<TSerializer>.ParseCollection<T>(null, null, null);
-                DeserializeListWithElements<T, TSerializer>.ParseGenericList(null, null, null);
-
-                SpecializedQueueElements<T>.ConvertToQueue(null);
-                SpecializedQueueElements<T>.ConvertToStack(null);
-*/
-
-                WriteListsOfElements<T, TSerializer>.WriteList(null, null);
-                WriteListsOfElements<T, TSerializer>.WriteIList(null, null);
-                WriteListsOfElements<T, TSerializer>.WriteEnumerable(null, null);
-                WriteListsOfElements<T, TSerializer>.WriteListValueType(null, null);
-                WriteListsOfElements<T, TSerializer>.WriteIListValueType(null, null);
-                WriteListsOfElements<T, TSerializer>.WriteGenericArrayValueType(null, null);
-                WriteListsOfElements<T, TSerializer>.WriteArray(null, null);
-
-                TranslateListWithElements<T>.LateBoundTranslateToGenericICollection(null, null);
-                TranslateListWithConvertibleElements<T, T>.LateBoundTranslateToGenericICollection(null, null);
-
-                QueryStringWriter<T>.WriteObject(null, null);
-                return i;
-            }
-
-            internal static void RegisterElement<T, TElement, TSerializer>() where TSerializer : ITypeSerializer
-            {
-                DeserializeDictionary<TSerializer>.ParseDictionary<T, TElement>(null, null, null, null);
-                DeserializeDictionary<TSerializer>.ParseDictionary<TElement, T>(null, null, null, null);
-
-                ToStringDictionaryMethods<T, TElement, TSerializer>.WriteIDictionary(null, null, null, null);
-                ToStringDictionaryMethods<TElement, T, TSerializer>.WriteIDictionary(null, null, null, null);
-
-                // Include List deserialisations from the Register<> method above.  This solves issue where List<Guid> properties on responses deserialise to null.
-                // No idea why this is happening because there is no visible exception raised.  Suspect IOS is swallowing an AOT exception somewhere.
-                DeserializeArrayWithElements<TElement, TSerializer>.ParseGenericArray(null, null);
-                DeserializeListWithElements<TElement, TSerializer>.ParseGenericList(null, null, null);
-
-                // Cannot use the line below for some unknown reason - when trying to compile to run on device, mtouch bombs during native code compile.
-                // Something about this line or its inner workings is offensive to mtouch. Luckily this was not needed for my List<Guide> issue.
-                // DeserializeCollection<JsonTypeSerializer>.ParseCollection<TElement>(null, null, null);
-
-                TranslateListWithElements<TElement>.LateBoundTranslateToGenericICollection(null, typeof(List<TElement>));
-                TranslateListWithConvertibleElements<TElement, TElement>.LateBoundTranslateToGenericICollection(null, typeof(List<TElement>));
-            }
-        }
-    }
-#endif
-
 #if ANDROID
     public class AndroidPclExport : Net40PclExport
     {
@@ -881,7 +634,7 @@ namespace ServiceStack
     {
         private static readonly ITypeSerializer Serializer = JsWriter.GetTypeSerializer<TSerializer>();
 
-        private static int VerifyAndGetStartIndex(StringSegment value, Type createMapType)
+        private static int VerifyAndGetStartIndex(ReadOnlySpan<char> value, Type createMapType)
         {
             var index = 0;
             if (!Serializer.EatMapStartChar(value, ref index))
@@ -893,11 +646,11 @@ namespace ServiceStack
             return index;
         }
 
-        public static Hashtable ParseHashtable(string value) => ParseHashtable(new StringSegment(value));
+        public static Hashtable ParseHashtable(string value) => ParseHashtable(value.AsSpan());
 
-        public static Hashtable ParseHashtable(StringSegment value)
+        public static Hashtable ParseHashtable(ReadOnlySpan<char> value)
         {
-            if (!value.HasValue)
+            if (value.IsEmpty)
                 return null;
 
             var index = VerifyAndGetStartIndex(value, typeof(Hashtable));
@@ -912,10 +665,10 @@ namespace ServiceStack
                 var keyValue = Serializer.EatMapKey(value, ref index);
                 Serializer.EatMapKeySeperator(value, ref index);
                 var elementValue = Serializer.EatValue(value, ref index);
-                if (!keyValue.HasValue) continue;
+                if (keyValue.IsEmpty) continue;
 
-                var mapKey = keyValue.Value;
-                var mapValue = elementValue.Value;
+                var mapKey = keyValue.ToString();
+                var mapValue = elementValue.Value();
 
                 result[mapKey] = mapValue;
 
@@ -925,10 +678,10 @@ namespace ServiceStack
             return result;
         }
 
-        public static StringCollection ParseStringCollection<TS>(string value) where TS : ITypeSerializer => ParseStringCollection<TS>(new StringSegment(value));
+        public static StringCollection ParseStringCollection<TS>(string value) where TS : ITypeSerializer => ParseStringCollection<TS>(value.AsSpan());
 
 
-        public static StringCollection ParseStringCollection<TS>(StringSegment value) where TS : ITypeSerializer
+        public static StringCollection ParseStringCollection<TS>(ReadOnlySpan<char> value) where TS : ITypeSerializer
         {
             if ((value = DeserializeListWithElements<TS>.StripList(value)) == null) return null;
             return value.Length == 0

@@ -111,13 +111,11 @@ namespace ServiceStack.Text.Common
                 switch (JsConfig.DateHandler)
                 {
                     case DateHandler.UnixTime:
-                        int unixTime;
-                        if (int.TryParse(dateTimeStr, out unixTime))
+                        if (int.TryParse(dateTimeStr, out var unixTime))
                             return unixTime.FromUnixTime();
                         break;
                     case DateHandler.UnixTimeMs:
-                        long unixTimeMs;
-                        if (long.TryParse(dateTimeStr, out unixTimeMs))
+                        if (long.TryParse(dateTimeStr, out var unixTimeMs))
                             return unixTimeMs.FromUnixTimeMs();
                         break;
                     case DateHandler.ISO8601:
@@ -417,7 +415,7 @@ namespace ServiceStack.Text.Common
 
         public static TimeSpan ParseNSTimeInterval(string doubleInSecs)
         {
-            var secs = double.Parse(doubleInSecs);
+            var secs = double.Parse(doubleInSecs, CultureInfo.InvariantCulture);
             return TimeSpan.FromSeconds(secs);
         }
 
@@ -443,8 +441,12 @@ namespace ServiceStack.Text.Common
         public static string ToShortestXsdDateTimeString(DateTime dateTime)
         {
             dateTime = dateTime.UseConfigSpecifiedSetting();
-            var timeOfDay = dateTime.TimeOfDay;
+            if (!string.IsNullOrEmpty(JsConfig.DateTimeFormat))
+            {
+                return dateTime.ToString(JsConfig.DateTimeFormat, CultureInfo.InvariantCulture);
+            }
 
+            var timeOfDay = dateTime.TimeOfDay;
             var isStartOfDay = timeOfDay.Ticks == 0;
             if (isStartOfDay && !JsConfig.SkipDateTimeConversion)
                 return dateTime.ToString(ShortDateTimeFormat, CultureInfo.InvariantCulture);

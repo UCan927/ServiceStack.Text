@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using ServiceStack.Text.Json;
 using ServiceStack.Text.Jsv;
 
@@ -153,24 +155,24 @@ namespace ServiceStack.Text.Common
             }
         }
 
-        public static void AssertAllowedRuntimeType(Type type)
+        public static bool ShouldAllowRuntmieType(Type type)
         {
             if (!JsState.IsRuntimeType)
-                return;
+                return true;
 
             if (JsConfig.AllowRuntimeType?.Invoke(type) == true)
-                return;
+                return true;
 
             var allowAttributesNamed = JsConfig.AllowRuntimeTypeWithAttributesNamed;
             if (allowAttributesNamed?.Count > 0)
             {
-                var OAttrs = type.AllAttributes();
-                foreach (var oAttr in OAttrs)
+                var oAttrs = type.AllAttributes();
+                foreach (var oAttr in oAttrs)
                 {
                     var attr = oAttr as Attribute;
                     if (attr == null) continue;
                     if (allowAttributesNamed.Contains(attr.GetType().Name))
-                        return;
+                        return true;
                 }
             }
 
@@ -181,11 +183,17 @@ namespace ServiceStack.Text.Common
                 foreach (var interfaceType in interfaces)
                 {
                     if (allowInterfacesNamed.Contains(interfaceType.Name))
-                        return;
+                        return true;
                 }
             }
 
-            throw new NotSupportedException($"{type.Name} is not an allowed Runtime Type. Whitelist Type with [RuntimeSerializable] or IRuntimeSerializable.");
+            return false;
+        }
+
+        public static void AssertAllowedRuntimeType(Type type)
+        {
+            if (!ShouldAllowRuntmieType(type))
+                throw new NotSupportedException($"{type.Name} is not an allowed Runtime Type. Whitelist Type with [RuntimeSerializable] or IRuntimeSerializable.");
         }
     }
 
@@ -275,9 +283,13 @@ namespace ServiceStack.Text.Common
             else
             {
                 if (underlyingType.IsEnum)
-                    return type.FirstAttribute<FlagsAttribute>() != null
-                        ? (WriteObjectDelegate)Serializer.WriteEnumFlags
-                        : Serializer.WriteEnum;
+                {
+                    if (type.HasAttribute<DataContractAttribute>())
+                        return Serializer.WriteEnumMember;
+                    if (type.HasAttribute<FlagsAttribute>())
+                        return Serializer.WriteEnumFlags;
+                    return Serializer.WriteEnum;
+                }
             }
 
             if (type.HasInterface(typeof(IFormattable)))
@@ -382,7 +394,7 @@ namespace ServiceStack.Text.Common
                         mapTypeArgs[0], mapTypeArgs[1]);
 
                     var keyWriteFn = Serializer.GetWriteFn(mapTypeArgs[0]);
-                    var valueWriteFn = typeof(T) == typeof(JsonObject)
+                    var valueWriteFn = typeof(JsonObject).IsAssignableFrom(typeof(T))
                         ? JsonObject.WriteValue
                         : Serializer.GetWriteFn(mapTypeArgs[1]);
 
@@ -431,8 +443,7 @@ namespace ServiceStack.Text.Common
 
         public WriteObjectDelegate GetSpecialWriteFn(Type type)
         {
-            WriteObjectDelegate writeFn = null;
-            if (SpecialTypes.TryGetValue(type, out writeFn))
+            if (SpecialTypes.TryGetValue(type, out var writeFn))
                 return writeFn;
 
             if (type.IsInstanceOfType(typeof(Type)))
@@ -447,6 +458,23 @@ namespace ServiceStack.Text.Common
         public void WriteType(TextWriter writer, object value)
         {
             Serializer.WriteRawString(writer, JsConfig.TypeWriter((Type)value));
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static void InitAot<T>()
+        {
+            WriteListsOfElements<T, TSerializer>.WriteList(null, null);
+            WriteListsOfElements<T, TSerializer>.WriteIList(null, null);
+            WriteListsOfElements<T, TSerializer>.WriteEnumerable(null, null);
+            WriteListsOfElements<T, TSerializer>.WriteListValueType(null, null);
+            WriteListsOfElements<T, TSerializer>.WriteIListValueType(null, null);
+            WriteListsOfElements<T, TSerializer>.WriteGenericArrayValueType(null, null);
+            WriteListsOfElements<T, TSerializer>.WriteArray(null, null);
+
+            TranslateListWithElements<T>.LateBoundTranslateToGenericICollection(null, null);
+            TranslateListWithConvertibleElements<T, T>.LateBoundTranslateToGenericICollection(null, null);
+
+            QueryStringWriter<T>.WriteObject(null, null);
         }
     }
 }

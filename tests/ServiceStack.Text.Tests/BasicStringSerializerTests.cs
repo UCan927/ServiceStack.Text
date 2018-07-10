@@ -61,7 +61,7 @@ namespace ServiceStack.Text.Tests
         [Test]
         public void Null_or_Empty_string_returns_null()
         {
-            var convertedJsvValues = TypeSerializer.DeserializeFromString<List<string>>(null);
+            var convertedJsvValues = TypeSerializer.DeserializeFromString<List<string>>((string)null);
             Assert.That(convertedJsvValues, Is.EqualTo(null));
 
             convertedJsvValues = TypeSerializer.DeserializeFromString<List<string>>(string.Empty);
@@ -78,7 +78,7 @@ namespace ServiceStack.Text.Tests
         [Test]
         public void Null_or_Empty_string_returns_null_Map()
         {
-            var convertedStringValues = TypeSerializer.DeserializeFromString<Dictionary<string, string>>(null);
+            var convertedStringValues = TypeSerializer.DeserializeFromString<Dictionary<string, string>>((string)null);
             Assert.That(convertedStringValues, Is.EqualTo(null));
 
             convertedStringValues = TypeSerializer.DeserializeFromString<Dictionary<string, string>>(string.Empty);
@@ -133,7 +133,7 @@ namespace ServiceStack.Text.Tests
         [Test]
         public void Can_convert_to_nullable_enum_with_null_value()
         {
-            var enumValue = TypeSerializer.DeserializeFromString<TestEnum?>(null);
+            var enumValue = TypeSerializer.DeserializeFromString<TestEnum?>((string)null);
             Assert.That(enumValue, Is.Null);
         }
 
@@ -571,7 +571,7 @@ namespace ServiceStack.Text.Tests
         {
             foreach (var invalidChar in allCharsUsed)
             {
-                var singleInvalidChar = string.Format("a {0} b", invalidChar);
+                var singleInvalidChar = $"a {invalidChar} b";
 
                 var instance = new ModelWithMapAndList<string>
                 {
@@ -615,6 +615,14 @@ namespace ServiceStack.Text.Tests
             var toModel = Serialize(model);
 
             Assert.That(toModel, Is.EquivalentTo(model));
+        }
+
+        [Test]
+        public void Can_deserialize_int_with_leading_zeros()
+        {
+            Assert.That("01".FromJson<int>(), Is.EqualTo(1));
+            Assert.That("01".FromJson<long>(), Is.EqualTo(1));
+            Assert.That("01".FromJson<ulong>(), Is.EqualTo(1));
         }
 #endif
     }

@@ -49,6 +49,12 @@ namespace ServiceStack.Text
                 IsLinux = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux);
                 IsWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
                 IsOSX  = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX);
+                
+                if (!IsIOS && IsOSX && System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription.Contains("Mono")
+                    && System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory().StartsWith("/private/var"))
+                {
+                    IsIOS = true; //iOS detection no longer trustworthy so assuming iOS based on some current heuristics. TODO: improve iOS detection
+                }
             }
             catch (Exception) {} //throws PlatformNotSupportedException in AWS lambda
             IsUnix = IsOSX || IsLinux;
@@ -61,7 +67,7 @@ namespace ServiceStack.Text
             if (Environment.GetEnvironmentVariable("OS")?.IndexOf("Windows", StringComparison.OrdinalIgnoreCase) >= 0)
                 IsWindows = true;
 #endif
-            SupportsExpressions = true;
+            SupportsExpressions = !IsIOS;
             SupportsEmit = !IsIOS;
 
             ServerUserAgent = "ServiceStack/" +
@@ -72,6 +78,9 @@ namespace ServiceStack.Text
             VersionString = ServiceStackVersion.ToString(CultureInfo.InvariantCulture);
 
             __releaseDate = new DateTime(2001,01,01);
+
+            PclExport.Instance.SupportsEmit = SupportsEmit;
+            PclExport.Instance.SupportsExpression = SupportsExpressions;
         }
 
         public static string VersionString { get; set; }
@@ -154,7 +163,7 @@ namespace ServiceStack.Text
                 }
                 return referenceAssembyPath;
             }
-            set { referenceAssembyPath = value; }
+            set => referenceAssembyPath = value;
         }
     }
 }

@@ -332,6 +332,15 @@ namespace ServiceStack
             return output;
         }
 
+        public static string ToBase64UrlSafe(this MemoryStream ms)
+        {
+            var output = Convert.ToBase64String(ms.GetBuffer(), 0, (int)ms.Length);
+            output = output.LeftPart('='); // Remove any trailing '='s
+            output = output.Replace('+', '-'); // 62nd char of encoding
+            output = output.Replace('/', '_'); // 63rd char of encoding
+            return output;
+        }
+
         // from JWT spec
         public static byte[] FromBase64UrlSafe(this string input)
         {
@@ -522,6 +531,11 @@ namespace ServiceStack
             return TypeSerializer.DeserializeFromString<T>(jsv);
         }
 
+        public static T FromJsvSpan<T>(this ReadOnlySpan<char> jsv)
+        {
+            return TypeSerializer.DeserializeFromSpan<T>(jsv);
+        }
+
         public static string ToJson<T>(this T obj)
         {
             return JsConfig.PreferInterfaces
@@ -539,6 +553,11 @@ namespace ServiceStack
         public static T FromJson<T>(this string json)
         {
             return JsonSerializer.DeserializeFromString<T>(json);
+        }
+
+        public static T FromJsonSpan<T>(this ReadOnlySpan<char> json)
+        {
+            return JsonSerializer.DeserializeFromSpan<T>(json);
         }
 
         public static string ToCsv<T>(this T obj)
@@ -559,6 +578,10 @@ namespace ServiceStack
         public static string Fmt(this string text, params object[] args)
         {
             return Format(text, args);
+        }
+        public static string Fmt(this string text, IFormatProvider provider, params object[] args)
+        {
+            return Format(provider, text, args);
         }
 
         public static string Fmt(this string text, object arg1)
@@ -766,7 +789,7 @@ namespace ServiceStack
                 else
                 {
                     sb.Append("_");
-                    sb.Append(char.ToLowerInvariant(t));
+                    sb.Append(char.ToLower(t));
                 }
             }
             return StringBuilderThreadStatic.ReturnAndFree(sb);
@@ -784,12 +807,13 @@ namespace ServiceStack
 
         public static string SafeSubstring(this string value, int startIndex)
         {
+            if (String.IsNullOrEmpty(value)) return Empty;
             return SafeSubstring(value, startIndex, value.Length);
         }
 
         public static string SafeSubstring(this string value, int startIndex, int length)
         {
-            if (String.IsNullOrEmpty(value)) return Empty;
+            if (String.IsNullOrEmpty(value) || length <= 0) return Empty;
             if (startIndex < 0) startIndex = 0;
             if (value.Length >= (startIndex + length))
                 return value.Substring(startIndex, length);
@@ -797,7 +821,10 @@ namespace ServiceStack
             return value.Length > startIndex ? value.Substring(startIndex) : Empty;
         }
 
-        public static string SubstringWithElipsis(this string value, int startIndex, int length)
+        [Obsolete("typo")]
+        public static string SubstringWithElipsis(this string value, int startIndex, int length) => SubstringWithEllipsis(value, startIndex, length);
+
+        public static string SubstringWithEllipsis(this string value, int startIndex, int length)
         {
             var str = value.SafeSubstring(startIndex, length);
             return str.Length == length
@@ -823,8 +850,9 @@ namespace ServiceStack
             return str.EndsWith(endsWith, PclExport.Instance.InvariantComparison);
         }
 
-        private static readonly Regex InvalidVarCharsRegex = new Regex(@"[^A-Za-z0-9]", PclExport.Instance.RegexOptions);
-        private static readonly Regex SplitCamelCaseRegex = new Regex("([A-Z]|[0-9]+)", PclExport.Instance.RegexOptions);
+        private static readonly Regex InvalidVarCharsRegex = new Regex(@"[^A-Za-z0-9_]", RegexOptions.Compiled);
+        private static readonly Regex InvalidVarRefCharsRegex = new Regex(@"[^A-Za-z0-9._]", RegexOptions.Compiled);
+        private static readonly Regex SplitCamelCaseRegex = new Regex("([A-Z]|[0-9]+)", RegexOptions.Compiled);
         private static readonly Regex HttpRegex = new Regex(@"^http://",
             PclExport.Instance.RegexOptions | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
@@ -910,11 +938,11 @@ namespace ServiceStack
             return false;
         }
 
-        public static string SafeVarName(this string text)
-        {
-            if (string.IsNullOrEmpty(text)) return null;
-            return InvalidVarCharsRegex.Replace(text, "_");
-        }
+        public static string SafeVarName(this string text) => !string.IsNullOrEmpty(text) 
+            ? InvalidVarCharsRegex.Replace(text, "_") : null;
+
+        public static string SafeVarRef(this string text) => !string.IsNullOrEmpty(text) 
+            ? InvalidVarRefCharsRegex.Replace(text, "_") : null;
 
         public static string Join(this List<string> items)
         {

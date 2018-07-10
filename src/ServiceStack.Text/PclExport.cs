@@ -38,6 +38,12 @@ namespace ServiceStack
 
         static PclExport() {}
 
+        public virtual void Init()
+        {
+            this.SupportsEmit = Env.SupportsEmit;
+            this.SupportsExpression = Env.SupportsExpressions;
+        }
+
         public static bool ConfigureProvider(string typeName)
         {
             var type = Type.GetType(typeName);
@@ -366,7 +372,7 @@ namespace ServiceStack
             return null;
         }
 
-        public virtual ParseStringSegmentDelegate GetDictionaryParseStringSegmentMethod<TSerializer>(Type type)
+        public virtual ParseStringSpanDelegate GetDictionaryParseStringSpanMethod<TSerializer>(Type type)
             where TSerializer : ITypeSerializer
         {
             return null;
@@ -378,7 +384,7 @@ namespace ServiceStack
             return null;
         }
 
-        public virtual ParseStringSegmentDelegate GetSpecializedCollectionParseStringSegmentMethod<TSerializer>(Type type)
+        public virtual ParseStringSpanDelegate GetSpecializedCollectionParseStringSpanMethod<TSerializer>(Type type)
             where TSerializer : ITypeSerializer
         {
             return null;
@@ -390,7 +396,7 @@ namespace ServiceStack
             return null;
         }
 
-        public virtual ParseStringSegmentDelegate GetJsReaderParseStringSegmentMethod<TSerializer>(Type type)
+        public virtual ParseStringSpanDelegate GetJsReaderParseStringSpanMethod<TSerializer>(Type type)
             where TSerializer : ITypeSerializer
         {
             return null;

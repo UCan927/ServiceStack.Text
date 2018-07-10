@@ -660,8 +660,7 @@ namespace ServiceStack
 
             var type = obj.GetType();
 
-            ObjectDictionaryDefinition def;
-            if (!toObjectMapCache.TryGetValue(type, out def))
+            if (!toObjectMapCache.TryGetValue(type, out var def))
                 toObjectMapCache[type] = def = CreateObjectDictionaryDefinition(type);
 
             var dict = new Dictionary<string, object>();
@@ -674,9 +673,12 @@ namespace ServiceStack
             return dict;
         }
 
-        public static object FromObjectDictionary(this Dictionary<string, object> values, Type type)
+        public static object FromObjectDictionary(this IReadOnlyDictionary<string, object> values, Type type)
         {
-            var alreadyDict = type == typeof(Dictionary<string, object>);
+            if (values == null)
+                return null;
+            
+            var alreadyDict = type == typeof(IReadOnlyDictionary<string, object>);
             if (alreadyDict)
                 return true;
 
@@ -696,7 +698,7 @@ namespace ServiceStack
             return to;
         }
 
-        public static T FromObjectDictionary<T>(this Dictionary<string, object> values)
+        public static T FromObjectDictionary<T>(this IReadOnlyDictionary<string, object> values)
         {
             return (T)values.FromObjectDictionary(typeof(T));
         }
@@ -745,26 +747,45 @@ namespace ServiceStack
                 {
                     var valueType = entry.Value?.GetType();
 
-                    if (valueType == null || !valueType.IsClass || valueType == typeof(string))
+                    try
                     {
-                        to[entry.Key] = entry.Value;
-                    }
-                    else if (!TypeSerializer.HasCircularReferences(entry.Value))
-                    {
-                        if (entry.Value is IEnumerable enumerable)
+                        if (valueType == null || !valueType.IsClass || valueType == typeof(string))
                         {
                             to[entry.Key] = entry.Value;
                         }
+                        else if (!TypeSerializer.HasCircularReferences(entry.Value))
+                        {
+                            if (entry.Value is IEnumerable enumerable)
+                            {
+                                to[entry.Key] = entry.Value;
+                            }
+                            else
+                            {
+                                to[entry.Key] = entry.Value.ToSafePartialObjectDictionary();
+                            }
+                        }
                         else
                         {
-                            to[entry.Key] = entry.Value.ToSafePartialObjectDictionary();
+                            to[entry.Key] = entry.Value.ToString();
                         }
+
                     }
-                    else
+                    catch (Exception ignore)
                     {
-                        to[entry.Key] = entry.Value.ToString();
+                        Tracer.Instance.WriteDebug($"Could not retrieve value from '{valueType?.GetType().Name}': ${ignore.Message}");
                     }
                 }
+            }
+            return to;
+        }
+
+        public static Dictionary<string, object> MergeIntoObjectDictionary(this object obj, params object[] sources)
+        {
+            var to = obj.ToObjectDictionary();
+            foreach (var source in sources)
+            foreach (var entry in source.ToObjectDictionary())
+            {
+                to[entry.Key] = entry.Value;
             }
             return to;
         }
